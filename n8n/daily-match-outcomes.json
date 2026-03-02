@@ -1,0 +1,107 @@
+{
+  "name": "Daily Match Outcomes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/match-outcomes",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "http-match",
+      "name": "Match Outcomes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-unmatched",
+              "leftValue": "={{ $json.unmatched }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-unmatched",
+      "name": "Has Unmatched?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-msg",
+              "name": "message",
+              "value": "=Match Outcomes ({{ $json.target_date }}): {{ $json.matched }} matched, {{ $json.unmatched }} unmatched out of {{ $json.total_predictions }} predictions",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-summary",
+      "name": "Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [860, 200]
+    }
+  ],
+  "connections": {
+    "Daily 06:00": {
+      "main": [
+        [{ "node": "Match Outcomes", "type": "main", "index": 0 }]
+      ]
+    },
+    "Match Outcomes": {
+      "main": [
+        [{ "node": "Has Unmatched?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Unmatched?": {
+      "main": [
+        [{ "node": "Summary", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "predictions" }]
+}

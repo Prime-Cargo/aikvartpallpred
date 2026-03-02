@@ -1,0 +1,112 @@
+{
+  "name": "Monthly Model Retrain",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 2,
+              "triggerAtDay": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "1st of Month 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/retrain",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "retrain-request",
+      "name": "POST /api/jobs/retrain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-failures",
+              "leftValue": "={{ $json.models_failed }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-failures",
+      "name": "Any failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "alert-msg",
+              "name": "message",
+              "value": "=Retrain completed with failures.\nTrained: {{ $json.models_trained }}\nFailed: {{ $json.models_failed }}\nTotal products: {{ $json.total_products }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "alert-message",
+      "name": "Alert Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {},
+      "id": "no-op",
+      "name": "All OK",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [910, 400]
+    }
+  ],
+  "connections": {
+    "1st of Month 02:00": {
+      "main": [
+        [{ "node": "POST /api/jobs/retrain", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /api/jobs/retrain": {
+      "main": [
+        [{ "node": "Any failures?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Any failures?": {
+      "main": [
+        [{ "node": "Alert Message", "type": "main", "index": 0 }],
+        [{ "node": "All OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

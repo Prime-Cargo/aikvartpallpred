@@ -1,0 +1,113 @@
+{
+  "name": "Drift Alert Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/check-drift",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"days\": 7, \"threshold\": 25}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "http-drift",
+      "name": "Check Drift",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-drift",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "drift",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-drift",
+      "name": "Is Drift?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-alert",
+              "name": "subject",
+              "value": "=🚨 Prediction Drift Alert — MAPE {{ $json.mape }}%",
+              "type": "string"
+            },
+            {
+              "id": "assign-body",
+              "name": "body",
+              "value": "={{ $json.message }}\n\nDetails:\n- MAPE: {{ $json.mape }}%\n- Threshold: {{ $json.threshold }}%\n- Period: {{ $json.days }} days\n- Outcomes evaluated: {{ $json.total_outcomes }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-notification",
+      "name": "Build Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [860, 200]
+    }
+  ],
+  "connections": {
+    "Daily 08:00": {
+      "main": [
+        [{ "node": "Check Drift", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Drift": {
+      "main": [
+        [{ "node": "Is Drift?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Drift?": {
+      "main": [
+        [{ "node": "Build Notification", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "predictions" }]
+}

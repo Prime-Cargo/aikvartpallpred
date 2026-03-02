@@ -1,0 +1,127 @@
+{
+  "name": "Weekly Accuracy Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtDay": 1,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Weekly Monday 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/accuracy-report",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"days\": 7}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "http-report",
+      "name": "Accuracy Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-drift",
+              "leftValue": "={{ $json.drift_alert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-drift",
+      "name": "Drift Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-alert",
+              "name": "message",
+              "value": "=⚠️ DRIFT ALERT: MAPE={{ $json.mape }}% (threshold: 25%). {{ $json.total_outcomes }} outcomes over {{ $json.period.days }} days. Bias={{ $json.bias }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-drift-alert",
+      "name": "Drift Alert Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [860, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-ok",
+              "name": "message",
+              "value": "=Weekly Report: MAPE={{ $json.mape }}%, Bias={{ $json.bias }}, Outcomes={{ $json.total_outcomes }}. No drift detected.",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-ok",
+      "name": "OK Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [860, 400]
+    }
+  ],
+  "connections": {
+    "Weekly Monday 07:00": {
+      "main": [
+        [{ "node": "Accuracy Report", "type": "main", "index": 0 }]
+      ]
+    },
+    "Accuracy Report": {
+      "main": [
+        [{ "node": "Drift Alert?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Drift Alert?": {
+      "main": [
+        [{ "node": "Drift Alert Message", "type": "main", "index": 0 }],
+        [{ "node": "OK Summary", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "predictions" }]
+}
