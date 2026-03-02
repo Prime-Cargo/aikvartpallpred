@@ -140,8 +140,19 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
 
       {/* Product list */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-          Laster produktstatus…
+        <div className="flex-1 overflow-hidden px-1">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div
+              key={i}
+              className="grid gap-2 items-center px-3.5 py-3 border-b border-border/40"
+              style={{ gridTemplateColumns: "110px 1fr 90px 50px" }}
+            >
+              <div className="w-20 h-3.5 bg-muted animate-pulse rounded" />
+              <div className="w-24 h-3.5 bg-muted animate-pulse rounded" />
+              <div className="w-16 h-5 bg-muted animate-pulse rounded" />
+              <div className="w-6 h-3.5 bg-muted animate-pulse rounded ml-auto" />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">

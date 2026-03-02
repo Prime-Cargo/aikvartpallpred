@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useWeekForecast } from "@/hooks/useWeekForecast";
 import { usePrediction, useAccuracyHistory } from "@/hooks/usePrediction";
+import { useOrderHistory } from "@/hooks/useOrderHistory";
 import type { ProductStatus } from "@/hooks/useProductStatus";
 
 const DAY_NAMES = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
@@ -31,6 +32,7 @@ export function DetailPanel({ product, targetDate }: DetailPanelProps) {
   const week = useWeekForecast(product.product_id, targetDate);
   const prediction = usePrediction(product.product_id, targetDate);
   const accuracy = useAccuracyHistory(product.product_id);
+  const orderHistory = useOrderHistory(product.product_id, 12);
   const [orderQty, setOrderQty] = useState(product.predicted_qty ?? 0);
   const [accepted, setAccepted] = useState(false);
 
@@ -66,7 +68,17 @@ export function DetailPanel({ product, targetDate }: DetailPanelProps) {
       <div>
         <SectionLabel>Ukesoversikt</SectionLabel>
         {week.loading ? (
-          <div className="text-sm text-muted-foreground animate-pulse py-4">Laster ukeprognose…</div>
+          <div className="flex gap-1.5">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex-1 rounded-lg p-2.5 bg-muted/40 border border-border min-w-[64px]">
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-8 h-3 bg-muted animate-pulse rounded" />
+                  <div className="w-6 h-2.5 bg-muted animate-pulse rounded" />
+                  <div className="w-8 h-6 bg-muted animate-pulse rounded mt-1" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : week.data ? (
           <div className="flex gap-1.5">
             {week.data.days.map((day) => {
@@ -108,7 +120,20 @@ export function DetailPanel({ product, targetDate }: DetailPanelProps) {
         <div className="bg-muted/40 rounded-xl p-5 border border-border">
           <SectionLabel>Bestillingsforslag</SectionLabel>
           {prediction.loading ? (
-            <div className="text-sm text-muted-foreground animate-pulse py-4">Henter forslag…</div>
+            <div className="space-y-3 py-1">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-10 bg-muted animate-pulse rounded" />
+                <div className="space-y-1.5">
+                  <div className="w-14 h-3 bg-muted animate-pulse rounded" />
+                  <div className="w-20 h-3 bg-muted animate-pulse rounded" />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <div className="w-16 h-8 bg-muted animate-pulse rounded-md" />
+                <div className="w-12 h-8 bg-muted animate-pulse rounded-md" />
+                <div className="w-16 h-8 bg-muted animate-pulse rounded-md" />
+              </div>
+            </div>
           ) : prediction.error ? (
             <div className="text-sm text-destructive py-4">Feil: {prediction.error}</div>
           ) : prediction.data ? (
@@ -172,6 +197,12 @@ export function DetailPanel({ product, targetDate }: DetailPanelProps) {
           <AccuracyMiniChart data={accuracy.data} loading={accuracy.loading} />
         </div>
       </div>
+
+      {/* Sales history */}
+      <div className="bg-muted/40 rounded-xl p-5 border border-border">
+        <SectionLabel>Historisk forbruk</SectionLabel>
+        <SalesHistoryChart data={orderHistory.data} loading={orderHistory.loading} />
+      </div>
     </div>
   );
 }
@@ -219,9 +250,63 @@ function ConfidenceDot({ modelVersion }: { modelVersion: string }) {
   );
 }
 
+function SalesHistoryChart({ data, loading }: { data: { week_label: string; total_qty: number; order_count: number }[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex gap-2 items-end h-[120px]">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+            <div className="w-full bg-muted animate-pulse rounded-t-sm" style={{ height: 20 + Math.random() * 60 }} />
+            <div className="w-6 h-2 bg-muted animate-pulse rounded mt-1.5" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return <div className="text-sm text-muted-foreground py-4">Ingen salgshistorikk tilgjengelig</div>;
+  }
+
+  const maxQty = Math.max(...data.map((d) => d.total_qty), 1);
+
+  return (
+    <div>
+      <div className="flex gap-2 items-end h-[120px]">
+        {data.map((w, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
+            <div className="relative w-full flex justify-center">
+              <div className="absolute -top-5 hidden group-hover:block text-[10px] font-mono text-foreground bg-card border border-border rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap z-10">
+                {w.total_qty} stk
+              </div>
+              <div
+                className="w-full max-w-[28px] bg-primary/70 hover:bg-primary rounded-t-sm transition-colors cursor-default"
+                style={{ height: Math.max(4, (w.total_qty / maxQty) * 100) }}
+              />
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-1.5 font-medium">{w.week_label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AccuracyMiniChart({ data, loading }: { data: { date: string; predicted: number; actual: number | null }[]; loading: boolean }) {
   if (loading) {
-    return <div className="text-sm text-muted-foreground animate-pulse py-4">Laster historikk…</div>;
+    return (
+      <div className="flex gap-3 items-end h-[60px]">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex-1 text-center">
+            <div className="flex gap-[3px] justify-center items-end h-[50px]">
+              <div className="w-3.5 bg-muted animate-pulse rounded-t-sm" style={{ height: 10 + Math.random() * 36 }} />
+              <div className="w-3.5 bg-muted animate-pulse rounded-t-sm" style={{ height: 10 + Math.random() * 36 }} />
+            </div>
+            <div className="w-8 h-2 bg-muted animate-pulse rounded mx-auto mt-1" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const hasData = data.length > 0 && data.some((d) => d.actual !== null);
