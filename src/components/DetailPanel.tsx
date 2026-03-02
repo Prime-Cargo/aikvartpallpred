@@ -49,7 +49,9 @@ export function DetailPanel({ product, targetDate }: DetailPanelProps) {
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-xl font-bold font-mono text-foreground">{product.product_id}</h2>
+            <h2 className="text-xl font-bold font-mono text-foreground">
+              {product.product_id.split(/\s+/)[0]}
+            </h2>
             <span className="text-base font-medium text-muted-foreground">{product.description}</span>
             <ModelBadge type={product.model_type} />
           </div>

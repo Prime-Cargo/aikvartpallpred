@@ -122,16 +122,19 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
       {/* Column headers */}
       <div
         className="grid gap-2 px-3.5 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border select-none"
-        style={{ gridTemplateColumns: "110px 1fr 90px 50px" }}
+        style={{ gridTemplateColumns: "90px 1fr 90px 80px 50px" }}
       >
         <SortHeader sortKey="product_id" currentKey={sortKey} dir={sortDir} onSort={handleSort}>
-          Produkt
+          ID
         </SortHeader>
         <SortHeader sortKey="description" currentKey={sortKey} dir={sortDir} onSort={handleSort}>
-          Type
+          Produkt
         </SortHeader>
         <SortHeader sortKey="model_type" currentKey={sortKey} dir={sortDir} onSort={handleSort}>
           Modell
+        </SortHeader>
+        <SortHeader sortKey="description" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">
+          Type
         </SortHeader>
         <SortHeader sortKey="predicted_qty" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">
           Ant.
@@ -145,11 +148,12 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
             <div
               key={i}
               className="grid gap-2 items-center px-3.5 py-3 border-b border-border/40"
-              style={{ gridTemplateColumns: "110px 1fr 90px 50px" }}
+              style={{ gridTemplateColumns: "90px 1fr 90px 80px 50px" }}
             >
+              <div className="w-16 h-3.5 bg-muted animate-pulse rounded" />
               <div className="w-20 h-3.5 bg-muted animate-pulse rounded" />
-              <div className="w-24 h-3.5 bg-muted animate-pulse rounded" />
-              <div className="w-16 h-5 bg-muted animate-pulse rounded" />
+              <div className="w-14 h-5 bg-muted animate-pulse rounded" />
+              <div className="w-16 h-3.5 bg-muted animate-pulse rounded ml-auto" />
               <div className="w-6 h-3.5 bg-muted animate-pulse rounded ml-auto" />
             </div>
           ))}
@@ -158,6 +162,7 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
         <div className="flex-1 overflow-y-auto">
           {filtered.map((p) => {
             const isSelected = p.product_id === selectedId;
+            const numericId = p.product_id.split(/\s+/)[0] ?? p.product_id;
             return (
               <div
                 key={p.product_id}
@@ -167,11 +172,12 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
                     ? "bg-accent border-l-[3px] border-l-primary"
                     : "border-l-[3px] border-l-transparent hover:bg-muted/40"
                 }`}
-                style={{ gridTemplateColumns: "110px 1fr 90px 50px" }}
+                style={{ gridTemplateColumns: "90px 1fr 90px 80px 50px" }}
               >
-                <span className="font-mono text-xs text-muted-foreground">{p.product_id}</span>
+                <span className="font-mono text-xs text-muted-foreground">{numericId}</span>
                 <span className="font-medium text-foreground truncate">{p.description}</span>
                 <ModelBadge type={p.model_type} />
+                <span className="font-mono text-xs text-muted-foreground text-right">kvartpall</span>
                 <span className={`font-mono text-[13px] font-semibold text-right ${
                   p.predicted_qty != null ? "text-foreground" : "text-border"
                 }`}>
