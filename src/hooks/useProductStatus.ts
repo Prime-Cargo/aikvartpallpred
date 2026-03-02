@@ -10,17 +10,15 @@ export interface ProductStatus {
   model_version: string | null;
 }
 
-const POLL_INTERVAL = 15_000; // 15 seconds
-
 export function useProductStatus(targetDate: string) {
   const [data, setData] = useState<ProductStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isMounted = useRef(true);
 
-  const fetchStatus = useCallback(async (showLoading: boolean) => {
+  const fetchStatus = useCallback(async () => {
     if (!targetDate) return;
-    if (showLoading) setLoading(true);
+    setLoading(true);
     setError(null);
 
     try {
@@ -31,22 +29,16 @@ export function useProductStatus(targetDate: string) {
     } catch (err: any) {
       if (isMounted.current) setError(err.message);
     } finally {
-      if (isMounted.current && showLoading) setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, [targetDate]);
 
-  // Initial fetch (with loading spinner)
+  // Fetch when targetDate changes
   useEffect(() => {
     isMounted.current = true;
-    fetchStatus(true);
+    fetchStatus();
     return () => { isMounted.current = false; };
   }, [fetchStatus]);
 
-  // Polling (silent refresh, no loading spinner)
-  useEffect(() => {
-    const id = setInterval(() => fetchStatus(false), POLL_INTERVAL);
-    return () => clearInterval(id);
-  }, [fetchStatus]);
-
-  return { data, loading, error, refetch: () => fetchStatus(false) };
+  return { data, loading, error, refetch: fetchStatus };
 }

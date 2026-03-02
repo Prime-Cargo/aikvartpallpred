@@ -13,6 +13,8 @@ import {
 import type { ProductStatus } from "@/hooks/useProductStatus";
 
 type ModelFilter = "all" | "prophet" | "ols" | "none";
+type SortKey = "product_id" | "description" | "model_type" | "predicted_qty" | "model_version";
+type SortDir = "asc" | "desc";
 
 interface ProductTableProps {
   products: ProductStatus[];
@@ -25,6 +27,17 @@ interface ProductTableProps {
 export function ProductTable({ products, loading, selectedId, loadingId, onSelect }: ProductTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ModelFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const counts = useMemo(() => {
     let prophet = 0, ols = 0, none = 0;
@@ -50,8 +63,22 @@ export function ProductTable({ products, loading, selectedId, loadingId, onSelec
       );
     }
 
+    if (sortKey) {
+      result = [...result].sort((a, b) => {
+        const av = a[sortKey];
+        const bv = b[sortKey];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        const cmp = typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
+
     return result;
-  }, [products, search, statusFilter]);
+  }, [products, search, statusFilter, sortKey, sortDir]);
 
   return (
     <div className="space-y-4">
@@ -99,11 +126,11 @@ export function ProductTable({ products, loading, selectedId, loadingId, onSelec
             <Table>
               <TableHeader className="sticky top-0 z-10">
                 <TableRow className="bg-muted/60 hover:bg-muted/60">
-                  <TableHead className="w-[220px]">Produkt</TableHead>
-                  <TableHead className="w-[100px]">Type</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="w-[100px] text-right">Forslag</TableHead>
-                  <TableHead className="w-[160px]">Modell</TableHead>
+                  <SortableHead width="w-[220px]" sortKey="product_id" currentKey={sortKey} dir={sortDir} onSort={handleSort}>Produkt</SortableHead>
+                  <SortableHead width="w-[100px]" sortKey="description" currentKey={sortKey} dir={sortDir} onSort={handleSort}>Type</SortableHead>
+                  <SortableHead width="w-[120px]" sortKey="model_type" currentKey={sortKey} dir={sortDir} onSort={handleSort}>Status</SortableHead>
+                  <SortableHead width="w-[100px]" sortKey="predicted_qty" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">Forslag</SortableHead>
+                  <SortableHead width="w-[160px]" sortKey="model_version" currentKey={sortKey} dir={sortDir} onSort={handleSort}>Modell</SortableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,6 +201,36 @@ function StatusBadge({ type }: { type: "prophet" | "ols" | "none" }) {
     case "none":
       return <Badge variant="outline" className="text-muted-foreground">Ingen modell</Badge>;
   }
+}
+
+function SortableHead({
+  children,
+  sortKey,
+  currentKey,
+  dir,
+  onSort,
+  width,
+  align,
+}: {
+  children: React.ReactNode;
+  sortKey: SortKey;
+  currentKey: SortKey | null;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  width?: string;
+  align?: "right";
+}) {
+  const active = currentKey === sortKey;
+  const arrow = active ? (dir === "asc" ? " ▲" : " ▼") : "";
+  return (
+    <TableHead
+      className={`${width ?? ""} ${align === "right" ? "text-right" : ""} cursor-pointer select-none hover:bg-muted/80 transition-colors`}
+      onClick={() => onSort(sortKey)}
+    >
+      {children}
+      <span className="text-xs ml-1 text-muted-foreground">{arrow}</span>
+    </TableHead>
+  );
 }
 
 function FilterButton({
