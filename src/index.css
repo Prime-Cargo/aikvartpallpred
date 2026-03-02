@@ -8,4 +8,15 @@
   body {
     @apply min-w-[320px] min-h-screen m-0 bg-background text-foreground;
   }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.84 0.02 94);
+    border-radius: 3px;
+  }
 }
