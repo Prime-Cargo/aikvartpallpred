@@ -1,0 +1,150 @@
+{
+  "name": "Monthly Prophet + Baseline Retrain",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3,
+              "triggerAtDay": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "1st of Month 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/retrain-prophet",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "retrain-prophet",
+      "name": "POST /api/jobs/retrain-prophet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/retrain-baseline",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "retrain-baseline",
+      "name": "POST /api/jobs/retrain-baseline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/evaluate-models",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "evaluate-models",
+      "name": "POST /api/jobs/evaluate-models",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-failures",
+              "leftValue": "={{ $json.failed }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-failures",
+      "name": "Any failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "alert-msg",
+              "name": "message",
+              "value": "=Prophet/Baseline retrain completed with failures.\nTrained: {{ $json.trained }}\nFailed: {{ $json.failed }}\nSkipped: {{ $json.skipped }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "alert-message",
+      "name": "Alert Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1350, 200]
+    },
+    {
+      "parameters": {},
+      "id": "no-op",
+      "name": "All OK",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1350, 400]
+    }
+  ],
+  "connections": {
+    "1st of Month 03:00": {
+      "main": [
+        [{ "node": "POST /api/jobs/retrain-prophet", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /api/jobs/retrain-prophet": {
+      "main": [
+        [{ "node": "POST /api/jobs/retrain-baseline", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /api/jobs/retrain-baseline": {
+      "main": [
+        [{ "node": "POST /api/jobs/evaluate-models", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /api/jobs/evaluate-models": {
+      "main": [
+        [{ "node": "Any failures?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Any failures?": {
+      "main": [
+        [{ "node": "Alert Message", "type": "main", "index": 0 }],
+        [{ "node": "All OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

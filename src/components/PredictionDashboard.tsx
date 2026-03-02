@@ -3,6 +3,8 @@ import { ProductSearch } from "./ProductSearch";
 import { PredictionCard } from "./PredictionCard";
 import { AccuracyChart } from "./AccuracyChart";
 import { usePrediction, useAccuracyHistory } from "@/hooks/usePrediction";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function tomorrow(): string {
   const d = new Date();
@@ -30,19 +32,18 @@ export function PredictionDashboard() {
       {/* Controls row */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
         <div className="space-y-1">
-          <label className="text-sm text-muted-foreground" htmlFor="target-date">
+          <Label htmlFor="target-date" className="text-muted-foreground">
             Dato
-          </label>
-          <input
+          </Label>
+          <Input
             id="target-date"
             type="date"
-            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
             value={targetDate}
             onChange={(e) => setTargetDate(e.target.value)}
           />
         </div>
         <div className="flex-1 space-y-1">
-          <label className="text-sm text-muted-foreground">Produkt</label>
+          <Label className="text-muted-foreground">Produkt</Label>
           <ProductSearch onSelect={handleSelect} />
         </div>
       </div>

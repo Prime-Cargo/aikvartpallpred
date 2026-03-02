@@ -12,6 +12,7 @@ import { buildFeatureVector } from "./lib/features";
 import { olsPredict } from "./lib/regression";
 import { runRetrain } from "./lib/training";
 import { supabaseSelect } from "./lib/supabase";
+import { getProphetForecast } from "./lib/prophet-loader";
 
 const server = serve({
   routes: {
@@ -65,45 +66,58 @@ const server = serve({
             );
           }
 
-          // Load trained model or fall back to historical average
-          const model = await getActiveModel(product_id);
+          // Three-tier fallback: Prophet -> OLS -> historical average
           let predictedQty: number;
           let modelVersion: string;
+          let confidence_low: number;
+          let confidence_high: number;
           let featuresSnapshot: Record<string, unknown> | null = features ?? null;
 
-          if (model) {
-            const featureVector = await buildFeatureVector(
-              product_id,
-              target_date,
-              model.normalization
-            );
-            const raw = olsPredict(featureVector, model.coefficients.weights, model.coefficients.intercept);
-            predictedQty = Math.max(0, Math.round(raw));
-            modelVersion = model.model_version;
-            featuresSnapshot = {
-              ...featuresSnapshot,
-              feature_vector: featureVector,
-              feature_names: model.feature_names,
-            };
+          // Tier 1: Prophet (pre-computed forecasts with real confidence intervals)
+          const prophetForecast = await getProphetForecast(product_id, target_date);
+          if (prophetForecast) {
+            predictedQty = Math.max(0, Math.round(prophetForecast.predicted_qty));
+            modelVersion = prophetForecast.model_version;
+            confidence_low = Math.max(0, Math.round(prophetForecast.yhat_lower));
+            confidence_high = Math.max(0, Math.round(prophetForecast.yhat_upper));
           } else {
-            // Fallback: historical average for this product over last 30 days
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const recentOrders = await supabaseSelect<{ quantity: number }>(
-              "order_history",
-              `product_id=eq.${product_id}&order_date=gte.${thirtyDaysAgo.toISOString().slice(0, 10)}&select=quantity`
-            );
-            if (recentOrders.length > 0) {
-              const total = recentOrders.reduce((sum, o) => sum + o.quantity, 0);
-              predictedQty = Math.round(total / 30);
+            // Tier 2: OLS model
+            const model = await getActiveModel(product_id);
+            if (model) {
+              const featureVector = await buildFeatureVector(
+                product_id,
+                target_date,
+                model.normalization
+              );
+              const raw = olsPredict(featureVector, model.coefficients.weights, model.coefficients.intercept);
+              predictedQty = Math.max(0, Math.round(raw));
+              modelVersion = model.model_version;
+              confidence_low = Math.round(predictedQty * 0.8);
+              confidence_high = Math.round(predictedQty * 1.2);
+              featuresSnapshot = {
+                ...featuresSnapshot,
+                feature_vector: featureVector,
+                feature_names: model.feature_names,
+              };
             } else {
-              predictedQty = 0;
+              // Tier 3: Historical average fallback
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              const recentOrders = await supabaseSelect<{ quantity: number }>(
+                "order_history",
+                `product_id=eq.${product_id}&order_date=gte.${thirtyDaysAgo.toISOString().slice(0, 10)}&select=quantity`
+              );
+              if (recentOrders.length > 0) {
+                const total = recentOrders.reduce((sum, o) => sum + o.quantity, 0);
+                predictedQty = Math.round(total / 30);
+              } else {
+                predictedQty = 0;
+              }
+              modelVersion = "v0-fallback-avg";
+              confidence_low = Math.round(predictedQty * 0.8);
+              confidence_high = Math.round(predictedQty * 1.2);
             }
-            modelVersion = "v0-fallback-avg";
           }
-
-          const confidence_low = Math.round(predictedQty * 0.8);
-          const confidence_high = Math.round(predictedQty * 1.2);
 
           const prediction = await logPrediction({
             product_id,
@@ -217,6 +231,42 @@ const server = serve({
         try {
           const result = await runRetrain();
           clearModelCache();
+          return Response.json(result);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+
+    "/api/jobs/retrain-prophet": {
+      async POST(req) {
+        try {
+          const result = await Bun.$`cd ${import.meta.dir}/../python && python train_prophet.py --all`.json();
+          return Response.json(result);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+
+    "/api/jobs/retrain-baseline": {
+      async POST(req) {
+        try {
+          const result = await Bun.$`cd ${import.meta.dir}/../python && python train_baseline.py`.json();
+          return Response.json(result);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+
+    "/api/jobs/evaluate-models": {
+      async POST(req) {
+        try {
+          const result = await Bun.$`cd ${import.meta.dir}/../python && python evaluate.py`.json();
           return Response.json(result);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
