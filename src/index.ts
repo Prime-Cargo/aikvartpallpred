@@ -84,7 +84,11 @@ const server = serve({
           }
 
           // Build status for each product
-          const products = [...ALLOWED_ARTICLES.entries()].map(([productId, description]) => {
+          const products = [...ALLOWED_ARTICLES.entries()].map(([productId]) => {
+            // Extract name from product_id key: "260501 KP140" → name "KP140"
+            const spaceIdx = productId.indexOf(" ");
+            const description = spaceIdx > 0 ? productId.slice(spaceIdx + 1) : productId;
+
             const prophet = prophetMap.get(productId);
             if (prophet) {
               return {
