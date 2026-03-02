@@ -78,7 +78,14 @@ group by product_id, order_date;
 -- Joins demand + weather, computes rolling averages, lags, weather deltas
 -- ============================================================
 create or replace view v_feature_engineering as
-with daily as (
+with weather_dedup as (
+  -- Pick one row per date: prefer 'frost' (actuals) over 'forecast'
+  select distinct on (date)
+    date, temp_avg, precipitation_mm, wind_speed
+  from weather_data
+  order by date, source desc  -- 'frost' (actuals) preferred over 'forecast'
+),
+daily as (
   select
     d.product_id,
     d.ds,
@@ -88,7 +95,7 @@ with daily as (
     w.precipitation_mm,
     w.wind_speed
   from v_daily_product_demand d
-  left join weather_data w on w.date = d.ds
+  left join weather_dedup w on w.date = d.ds
 ),
 with_rolling as (
   select

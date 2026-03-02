@@ -5,6 +5,12 @@ import { AccuracyChart } from "./AccuracyChart";
 import { usePrediction, useAccuracyHistory } from "@/hooks/usePrediction";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
 
 function tomorrow(): string {
   const d = new Date();
@@ -26,34 +32,34 @@ export function PredictionDashboard() {
   }
 
   return (
-    <div className="w-full max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">Kvartpall Bestillingsforslag</h1>
-
-      {/* Controls row */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-        <div className="space-y-1">
-          <Label htmlFor="target-date" className="text-muted-foreground">
-            Dato
-          </Label>
-          <Input
-            id="target-date"
-            type="date"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
-          />
-        </div>
-        <div className="flex-1 space-y-1">
-          <Label className="text-muted-foreground">Produkt</Label>
-          <ProductSearch onSelect={handleSelect} />
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* Controls */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+            <div className="space-y-1.5">
+              <Label htmlFor="target-date">Dato</Label>
+              <Input
+                id="target-date"
+                type="date"
+                value={targetDate}
+                onChange={(e) => setTargetDate(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <Label>Produkt</Label>
+              <ProductSearch onSelect={handleSelect} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Loading / Error */}
       {prediction.loading && (
         <p className="text-sm text-muted-foreground">Henter forslag…</p>
       )}
       {prediction.error && (
-        <p className="text-sm text-red-600">Feil: {prediction.error}</p>
+        <p className="text-sm text-destructive">Feil: {prediction.error}</p>
       )}
 
       {/* Results */}
@@ -71,7 +77,14 @@ export function PredictionDashboard() {
             }}
             onDismiss={() => setDismissed(true)}
           />
-          <AccuracyChart data={accuracy.data} loading={accuracy.loading} />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Treffsikkerhet</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AccuracyChart data={accuracy.data} loading={accuracy.loading} />
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
