@@ -187,6 +187,69 @@ const server = serve({
       },
     },
 
+    "/api/products/:id/order-history": {
+      async GET(req) {
+        try {
+          const { id: productId } = req.params;
+          const url = new URL(req.url);
+          const weeks = parseInt(url.searchParams.get("weeks") ?? "12", 10);
+
+          // Fetch orders for the last N weeks
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setDate(startDate.getDate() - weeks * 7);
+
+          const orders = await supabaseSelect<{
+            order_date: string;
+            quantity: number;
+          }>(
+            "order_history",
+            `product_id=eq.${encodeURIComponent(productId)}&order_date=gte.${startDate.toISOString().slice(0, 10)}&order_date=lte.${endDate.toISOString().slice(0, 10)}&select=order_date,quantity&order=order_date.asc`
+          );
+
+          // Aggregate by ISO week
+          const weekMap = new Map<string, { week_label: string; week_start: string; total_qty: number; order_count: number }>();
+
+          for (const o of orders) {
+            const d = new Date(o.order_date + "T00:00:00");
+            // Get Monday of this week
+            const day = d.getDay();
+            const monday = new Date(d);
+            monday.setDate(d.getDate() - ((day + 6) % 7));
+            const monStr = monday.toISOString().slice(0, 10);
+
+            // ISO week number
+            const tmp = new Date(d);
+            tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+            const yearStart = new Date(tmp.getFullYear(), 0, 4);
+            const weekNum = Math.round(((tmp.getTime() - yearStart.getTime()) / 86400000 + yearStart.getDay() + 6) / 7);
+
+            const key = monStr;
+            const existing = weekMap.get(key);
+            if (existing) {
+              existing.total_qty += o.quantity;
+              existing.order_count += 1;
+            } else {
+              weekMap.set(key, {
+                week_label: `u${weekNum}`,
+                week_start: monStr,
+                total_qty: o.quantity,
+                order_count: 1,
+              });
+            }
+          }
+
+          // Sort by week_start and return
+          const data = [...weekMap.values()].sort((a, b) => a.week_start.localeCompare(b.week_start));
+
+          return Response.json({ product_id: productId, weeks: data });
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+
     "/api/predict": {
       async GET() {
         return Response.json({

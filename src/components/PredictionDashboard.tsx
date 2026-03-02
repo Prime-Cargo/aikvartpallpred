@@ -1,18 +1,7 @@
 import { useState, useEffect } from "react";
 import { ProductTable } from "./ProductTable";
-import { WeekForecastPanel } from "./WeekForecastPanel";
-import { PredictionCard } from "./PredictionCard";
-import { AccuracyChart } from "./AccuracyChart";
-import { usePrediction, useAccuracyHistory } from "@/hooks/usePrediction";
+import { DetailPanel } from "./DetailPanel";
 import { useProductStatus } from "@/hooks/useProductStatus";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
 
 function tomorrow(): string {
   const d = new Date();
@@ -31,11 +20,8 @@ export function PredictionDashboard() {
   const [targetDate, setTargetDate] = useState(
     () => loadCached("kp:targetDate", tomorrow())
   );
-  const [dismissed, setDismissed] = useState(false);
 
   const productStatus = useProductStatus(targetDate);
-  const prediction = usePrediction(productId, targetDate);
-  const accuracy = useAccuracyHistory(productId);
 
   // Persist selection to localStorage
   useEffect(() => {
@@ -47,81 +33,61 @@ export function PredictionDashboard() {
 
   function handleSelect(id: string) {
     setProductId(id);
-    setDismissed(false);
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Top row: date picker + detail panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6 items-start">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-1.5">
-              <Label htmlFor="target-date">Dato</Label>
-              <Input
-                id="target-date"
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+  const selectedProduct = productStatus.data.find((p) => p.product_id === productId) ?? null;
 
-        {/* Weekly forecast panel */}
-        {productId && (
-          <WeekForecastPanel productId={productId} targetDate={targetDate} />
-        )}
+  return (
+    <div className="flex flex-col h-screen bg-background font-sans text-foreground">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card shrink-0">
+        <div className="flex items-center gap-3">
+          <img src="./prediction.png" alt="" className="size-6" />
+          <h1 className="text-base font-bold tracking-tight">Kvartpall Bestillingsforslag</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <label htmlFor="target-date" className="text-xs font-medium text-muted-foreground">
+            Dato
+          </label>
+          <input
+            id="target-date"
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            className="border border-border rounded-md px-2.5 py-1.5 text-sm bg-card font-sans"
+          />
+        </div>
       </div>
 
-      {/* Prediction detail + accuracy side by side */}
-      {productId && prediction.data && !dismissed && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PredictionCard
-            productId={productId}
-            predictedQty={prediction.data.predicted_quantity}
-            confidenceLow={prediction.data.confidence_low}
-            confidenceHigh={prediction.data.confidence_high}
-            modelVersion={prediction.data.model_version}
-            featuresSnapshot={prediction.data.features_snapshot}
-            onAccept={(qty) => {
-              console.log("Accepted:", productId, qty);
-            }}
-            onDismiss={() => setDismissed(true)}
-          />
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Treffsikkerhet</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AccuracyChart data={accuracy.data} loading={accuracy.loading} />
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {prediction.loading && (
-        <p className="text-sm text-muted-foreground">Henter forslag…</p>
-      )}
-      {prediction.error && (
-        <p className="text-sm text-destructive">Feil: {prediction.error}</p>
-      )}
-
-      {/* Product table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Alle produkter</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Main two-panel layout */}
+      <div className="flex flex-1 min-h-0">
+        {/* Left panel: product list */}
+        <div className="w-[460px] min-w-[400px] border-r border-border flex flex-col bg-card">
+          <div className="px-4 pt-4 pb-2">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Alle produkter</h2>
+          </div>
           <ProductTable
             products={productStatus.data}
             loading={productStatus.loading}
             selectedId={productId}
-            loadingId={prediction.loading ? productId : null}
             onSelect={handleSelect}
           />
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Right panel: detail */}
+        <div className="flex-1 overflow-y-auto p-7 bg-background">
+          {selectedProduct ? (
+            <DetailPanel
+              product={selectedProduct}
+              targetDate={targetDate}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              Velg et produkt fra listen
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
