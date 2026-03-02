@@ -4,7 +4,7 @@ FROM oven/bun:1 AS deps
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --production
 
 # --- Stage 2: Production image ---
 FROM oven/bun:1 AS runtime
@@ -36,7 +36,8 @@ ENV PATH="/app/python/.venv/bin:$PATH"
 
 # Port configuration
 ENV PORT=3534
+ENV NODE_ENV=production
 EXPOSE 3534
 
 # Run the server
-CMD ["bun", "src/index.ts"]
+CMD ["bun", "run", "start"]
