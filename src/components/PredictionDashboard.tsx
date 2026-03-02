@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ProductSearch } from "./ProductSearch";
+import { ProductTable } from "./ProductTable";
 import { PredictionCard } from "./PredictionCard";
 import { AccuracyChart } from "./AccuracyChart";
 import { usePrediction, useAccuracyHistory } from "@/hooks/usePrediction";
+import { useProductStatus } from "@/hooks/useProductStatus";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,6 +24,7 @@ export function PredictionDashboard() {
   const [targetDate, setTargetDate] = useState(tomorrow);
   const [dismissed, setDismissed] = useState(false);
 
+  const productStatus = useProductStatus(targetDate);
   const prediction = usePrediction(productId, targetDate);
   const accuracy = useAccuracyHistory(productId);
 
@@ -33,10 +35,10 @@ export function PredictionDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
+      {/* Date picker */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+          <div className="flex items-end gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="target-date">Dato</Label>
               <Input
@@ -46,11 +48,22 @@ export function PredictionDashboard() {
                 onChange={(e) => setTargetDate(e.target.value)}
               />
             </div>
-            <div className="flex-1 space-y-1.5">
-              <Label>Produkt</Label>
-              <ProductSearch onSelect={handleSelect} />
-            </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Product table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Alle produkter</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProductTable
+            products={productStatus.data}
+            loading={productStatus.loading}
+            selectedId={productId}
+            onSelect={handleSelect}
+          />
         </CardContent>
       </Card>
 
@@ -62,7 +75,7 @@ export function PredictionDashboard() {
         <p className="text-sm text-destructive">Feil: {prediction.error}</p>
       )}
 
-      {/* Results */}
+      {/* Detail panel */}
       {prediction.data && !dismissed && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <PredictionCard

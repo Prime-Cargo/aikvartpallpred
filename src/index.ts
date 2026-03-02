@@ -13,6 +13,7 @@ import { olsPredict } from "./lib/regression";
 import { runRetrain } from "./lib/training";
 import { supabaseSelect } from "./lib/supabase";
 import { getProphetForecast } from "./lib/prophet-loader";
+import { ALLOWED_ARTICLES } from "./config/articles";
 
 const server = serve({
   routes: {
@@ -39,6 +40,93 @@ const server = serve({
       return Response.json({
         message: `Hello, ${name}!`,
       });
+    },
+
+    "/api/products/status": {
+      async GET(req) {
+        try {
+          const url = new URL(req.url);
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const targetDate = url.searchParams.get("target_date") ?? tomorrow.toISOString().slice(0, 10);
+
+          // Batch-fetch all prophet forecasts for target_date
+          const prophetRows = await supabaseSelect<{
+            product_id: string;
+            predicted_qty: number;
+            yhat_lower: number;
+            yhat_upper: number;
+            model_version: string;
+          }>(
+            "prophet_forecasts",
+            `target_date=eq.${targetDate}&select=product_id,predicted_qty,yhat_lower,yhat_upper,model_version&order=created_at.desc`
+          );
+
+          // Batch-fetch all active OLS models
+          const olsRows = await supabaseSelect<{
+            product_id: string;
+            model_version: string;
+          }>(
+            "trained_models",
+            `is_active=eq.true&select=product_id,model_version`
+          );
+
+          // Index by product_id (keep first = latest)
+          const prophetMap = new Map<string, typeof prophetRows[0]>();
+          for (const row of prophetRows) {
+            if (!prophetMap.has(row.product_id)) prophetMap.set(row.product_id, row);
+          }
+
+          const olsMap = new Map<string, typeof olsRows[0]>();
+          for (const row of olsRows) {
+            if (!olsMap.has(row.product_id)) olsMap.set(row.product_id, row);
+          }
+
+          // Build status for each product
+          const products = [...ALLOWED_ARTICLES.entries()].map(([productId, description]) => {
+            const prophet = prophetMap.get(productId);
+            if (prophet) {
+              return {
+                product_id: productId,
+                description,
+                model_type: "prophet" as const,
+                predicted_qty: Math.max(0, Math.round(prophet.predicted_qty)),
+                confidence_low: Math.max(0, Math.round(prophet.yhat_lower)),
+                confidence_high: Math.max(0, Math.round(prophet.yhat_upper)),
+                model_version: prophet.model_version,
+              };
+            }
+
+            const ols = olsMap.get(productId);
+            if (ols) {
+              return {
+                product_id: productId,
+                description,
+                model_type: "ols" as const,
+                predicted_qty: null,
+                confidence_low: null,
+                confidence_high: null,
+                model_version: ols.model_version,
+              };
+            }
+
+            return {
+              product_id: productId,
+              description,
+              model_type: "none" as const,
+              predicted_qty: null,
+              confidence_low: null,
+              confidence_high: null,
+              model_version: null,
+            };
+          });
+
+          return Response.json(products);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
     },
 
     "/api/predict": {
@@ -242,8 +330,17 @@ const server = serve({
     "/api/jobs/retrain-prophet": {
       async POST(req) {
         try {
-          const result = await Bun.$`cd ${import.meta.dir}/../python && python train_prophet.py --all`.json();
-          return Response.json(result);
+          const proc = Bun.spawn(["python3", "train_prophet.py", "--all"], {
+            cwd: `${import.meta.dir}/../python`,
+            stdout: "pipe",
+            stderr: "pipe",
+          });
+          // Return immediately — let the process run in the background
+          return Response.json({
+            status: "started",
+            message: "Prophet retraining started in background",
+            pid: proc.pid,
+          });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           return Response.json({ error: message }, { status: 500 });
@@ -254,8 +351,16 @@ const server = serve({
     "/api/jobs/retrain-baseline": {
       async POST(req) {
         try {
-          const result = await Bun.$`cd ${import.meta.dir}/../python && python train_baseline.py`.json();
-          return Response.json(result);
+          const proc = Bun.spawn(["python3", "train_baseline.py"], {
+            cwd: `${import.meta.dir}/../python`,
+            stdout: "pipe",
+            stderr: "pipe",
+          });
+          return Response.json({
+            status: "started",
+            message: "Baseline retraining started in background",
+            pid: proc.pid,
+          });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           return Response.json({ error: message }, { status: 500 });
@@ -266,8 +371,16 @@ const server = serve({
     "/api/jobs/evaluate-models": {
       async POST(req) {
         try {
-          const result = await Bun.$`cd ${import.meta.dir}/../python && python evaluate.py`.json();
-          return Response.json(result);
+          const proc = Bun.spawn(["python3", "evaluate.py"], {
+            cwd: `${import.meta.dir}/../python`,
+            stdout: "pipe",
+            stderr: "pipe",
+          });
+          return Response.json({
+            status: "started",
+            message: "Model evaluation started in background",
+            pid: proc.pid,
+          });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           return Response.json({ error: message }, { status: 500 });
