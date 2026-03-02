@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from config import get_supabase
-from features import get_all_product_ids
+from features import get_all_product_ids, fetch_all_rows
 
 VERSION = f"baseline-v1-{datetime.now().strftime('%Y-%m')}"
 
@@ -24,17 +24,17 @@ def train_baseline_product(product_id: str) -> dict:
     sb = get_supabase()
 
     # Load all daily demand
-    resp = (
+    query = (
         sb.table("v_daily_product_demand")
         .select("ds,y")
         .eq("product_id", product_id)
         .order("ds")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return {"product_id": product_id, "status": "skipped", "reason": "no data"}
 
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["ds"] = pd.to_datetime(df["ds"])
     df["y"] = pd.to_numeric(df["y"], errors="coerce").fillna(0)
 

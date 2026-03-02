@@ -62,6 +62,60 @@ export async function supabasePatch<T = unknown>(
   if (!res.ok) throw new Error(`Supabase PATCH ${res.status}: ${await res.text()}`);
 }
 
+export async function supabaseDelete(
+  table: string,
+  query: string
+): Promise<void> {
+  const { url, key } = getConfig();
+  const endpoint = `${url}/rest/v1/${table}?${query}`;
+  const res = await fetch(endpoint, {
+    method: "DELETE",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    },
+  });
+  if (!res.ok) throw new Error(`Supabase DELETE ${res.status}: ${await res.text()}`);
+}
+
+export async function supabaseCount(
+  table: string,
+  query?: string
+): Promise<number> {
+  const { url, key } = getConfig();
+  const endpoint = `${url}/rest/v1/${table}?select=count${query ? `&${query}` : ""}`;
+  const res = await fetch(endpoint, {
+    method: "HEAD",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact",
+    },
+  });
+  if (!res.ok) throw new Error(`Supabase COUNT ${res.status}: ${await res.text()}`);
+  const range = res.headers.get("content-range");
+  // content-range: */123 or 0-99/123
+  const total = range?.split("/")[1];
+  return total ? parseInt(total, 10) : 0;
+}
+
+export async function supabaseSelectAll<T = unknown>(
+  table: string,
+  query?: string
+): Promise<T[]> {
+  const pageSize = 1000;
+  let offset = 0;
+  const all: T[] = [];
+  while (true) {
+    const paginatedQuery = `${query ?? ""}${query ? "&" : ""}limit=${pageSize}&offset=${offset}`;
+    const batch = await supabaseSelect<T>(table, paginatedQuery);
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all;
+}
+
 export async function supabaseUpsert<T = unknown>(
   table: string,
   rows: T[],

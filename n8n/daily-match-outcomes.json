@@ -20,6 +20,23 @@
     {
       "parameters": {
         "method": "POST",
+        "url": "http://100.73.211.36:3000/api/jobs/import-orders",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "http-import",
+      "name": "Import Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
         "url": "http://100.73.211.36:3000/api/jobs/match-outcomes",
         "sendBody": true,
         "specifyBody": "json",
@@ -32,7 +49,7 @@
       "name": "Match Outcomes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [420, 300]
+      "position": [640, 300]
     },
     {
       "parameters": {
@@ -60,7 +77,7 @@
       "name": "Has Unmatched?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [640, 300]
+      "position": [860, 300]
     },
     {
       "parameters": {
@@ -79,11 +96,16 @@
       "name": "Summary",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [860, 200]
+      "position": [1080, 200]
     }
   ],
   "connections": {
     "Daily 06:00": {
+      "main": [
+        [{ "node": "Import Orders", "type": "main", "index": 0 }]
+      ]
+    },
+    "Import Orders": {
       "main": [
         [{ "node": "Match Outcomes", "type": "main", "index": 0 }]
       ]

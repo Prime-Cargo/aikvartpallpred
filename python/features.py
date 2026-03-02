@@ -9,19 +9,35 @@ import numpy as np
 from config import get_supabase
 
 
+def fetch_all_rows(query) -> list[dict]:
+    """Paginate through Supabase to fetch all rows (default limit is 1000)."""
+    page_size = 1000
+    offset = 0
+    all_rows = []
+    while True:
+        resp = query.range(offset, offset + page_size - 1).execute()
+        if not resp.data:
+            break
+        all_rows.extend(resp.data)
+        if len(resp.data) < page_size:
+            break
+        offset += page_size
+    return all_rows
+
+
 def load_product_data(product_id: str) -> pd.DataFrame:
     """Load enriched daily data from v_feature_engineering view."""
     sb = get_supabase()
-    resp = (
+    query = (
         sb.table("v_feature_engineering")
         .select("*")
         .eq("product_id", product_id)
         .order("ds")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return pd.DataFrame()
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["ds"] = pd.to_datetime(df["ds"])
     numeric_cols = [
         "y", "n_customers", "temp_avg", "precipitation_mm", "wind_speed",
@@ -95,18 +111,18 @@ def build_prophet_df(product_id: str) -> pd.DataFrame:
 def compute_customer_frequency(product_id: str) -> float:
     """Compute median order interval (in days) per customer for this product."""
     sb = get_supabase()
-    resp = (
+    query = (
         sb.table("order_history")
         .select("customer_id,order_date")
         .eq("product_id", product_id)
         .not_.is_("customer_id", "null")
         .order("order_date")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return 0.0
 
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["order_date"] = pd.to_datetime(df["order_date"])
 
     intervals = []
@@ -122,11 +138,11 @@ def compute_customer_frequency(product_id: str) -> float:
 def get_all_product_ids() -> list[str]:
     """Get all distinct product IDs that have order history."""
     sb = get_supabase()
-    resp = (
+    query = (
         sb.table("v_daily_product_demand")
         .select("product_id")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return []
-    return list({row["product_id"] for row in resp.data})
+    return list({row["product_id"] for row in rows})

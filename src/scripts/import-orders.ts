@@ -7,7 +7,7 @@
  * filters to whitelisted articles, upserts into Supabase.
  */
 
-import { supabaseUpsert, supabaseSelect } from "../lib/supabase";
+import { supabaseUpsert, supabaseSelect, supabaseSelectAll, supabaseDelete, supabaseCount } from "../lib/supabase";
 import { ALLOWED_ARTICLES } from "../config/articles";
 
 const ASTRO_API_URL = process.env.ASTRO_API_URL;
@@ -175,7 +175,11 @@ async function main() {
   const deduped = deduplicateOrders(allRows);
   console.log(`After deduplication: ${deduped.length}`);
 
-  console.log("\nUpserting to Supabase...");
+  // Delete existing rows in date range to avoid duplicates, then insert fresh
+  console.log(`\nDeleting existing rows (${from} to ${to})...`);
+  await supabaseDelete("order_history", `order_date=gte.${from}&order_date=lte.${to}`);
+
+  console.log(`Inserting ${deduped.length} rows to Supabase...`);
   await supabaseUpsert("order_history", deduped, "id");
   console.log("Done!");
 
@@ -199,6 +203,8 @@ function deduplicateOrders(rows: OrderHistoryRow[]): OrderHistoryRow[] {
 async function validate() {
   console.log("\n--- Validation ---");
 
+  const totalRows = await supabaseCount("order_history");
+
   const earliest = await supabaseSelect<{ order_date: string }>(
     "order_history",
     "select=order_date&order=order_date.asc&limit=1"
@@ -208,18 +214,19 @@ async function validate() {
     "select=order_date&order=order_date.desc&limit=1"
   );
 
-  const products = await supabaseSelect<{ product_id: string }>(
+  // Fetch all rows for product/date analysis (paginated)
+  const products = await supabaseSelectAll<{ product_id: string }>(
     "order_history",
-    "select=product_id&order=product_id"
+    "select=product_id"
   );
   const uniqueProducts = new Set(products.map((p) => p.product_id));
 
   console.log(`  Date range: ${earliest[0]?.order_date ?? "?"} → ${latest[0]?.order_date ?? "?"}`);
   console.log(`  Unique products: ${uniqueProducts.size}`);
-  console.log(`  Total rows: ${products.length}`);
+  console.log(`  Total rows: ${totalRows}`);
 
-  // Check for date gaps > 3 days
-  const dates = await supabaseSelect<{ order_date: string }>(
+  // Check for date gaps > 3 days (paginated)
+  const dates = await supabaseSelectAll<{ order_date: string }>(
     "order_history",
     "select=order_date&order=order_date.asc"
   );

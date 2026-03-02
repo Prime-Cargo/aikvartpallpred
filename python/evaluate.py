@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from config import get_supabase
+from features import fetch_all_rows
 
 EVAL_DAYS = 90
 
@@ -22,17 +23,17 @@ def load_actuals() -> pd.DataFrame:
     sb = get_supabase()
     cutoff = (datetime.now() - timedelta(days=EVAL_DAYS)).strftime("%Y-%m-%d")
 
-    resp = (
+    query = (
         sb.table("v_daily_product_demand")
         .select("product_id,ds,y")
         .gte("ds", cutoff)
         .order("ds")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["ds"] = pd.to_datetime(df["ds"])
     df["y"] = pd.to_numeric(df["y"], errors="coerce").fillna(0)
     return df
@@ -43,18 +44,18 @@ def load_ols_predictions() -> pd.DataFrame:
     sb = get_supabase()
     cutoff = (datetime.now() - timedelta(days=EVAL_DAYS)).strftime("%Y-%m-%d")
 
-    resp = (
+    query = (
         sb.table("predictions")
         .select("product_id,target_date,predicted_qty,model_version")
         .gte("target_date", cutoff)
         .like("model_version", "%lr%")
         .order("target_date")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["ds"] = pd.to_datetime(df["target_date"])
     df["yhat"] = pd.to_numeric(df["predicted_qty"], errors="coerce")
     return df[["product_id", "ds", "yhat", "model_version"]]
@@ -65,17 +66,17 @@ def load_prophet_predictions() -> pd.DataFrame:
     sb = get_supabase()
     cutoff = (datetime.now() - timedelta(days=EVAL_DAYS)).strftime("%Y-%m-%d")
 
-    resp = (
+    query = (
         sb.table("prophet_forecasts")
         .select("product_id,target_date,predicted_qty,model_version")
         .gte("target_date", cutoff)
         .order("target_date")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["ds"] = pd.to_datetime(df["target_date"])
     df["yhat"] = pd.to_numeric(df["predicted_qty"], errors="coerce")
     return df[["product_id", "ds", "yhat", "model_version"]]
@@ -86,17 +87,17 @@ def load_baseline_predictions() -> pd.DataFrame:
     sb = get_supabase()
     cutoff = (datetime.now() - timedelta(days=EVAL_DAYS)).strftime("%Y-%m-%d")
 
-    resp = (
+    query = (
         sb.table("baseline_forecasts")
         .select("product_id,target_date,predicted_qty,model_version")
         .gte("target_date", cutoff)
         .order("target_date")
-        .execute()
     )
-    if not resp.data:
+    rows = fetch_all_rows(query)
+    if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(resp.data)
+    df = pd.DataFrame(rows)
     df["ds"] = pd.to_datetime(df["target_date"])
     df["yhat"] = pd.to_numeric(df["predicted_qty"], errors="coerce")
     return df[["product_id", "ds", "yhat", "model_version"]]

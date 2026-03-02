@@ -1,0 +1,16 @@
+node_modules
+.git
+.env
+.env.*
+.DS_Store
+.idea
+.cache
+.claude
+coverage
+dist
+out
+*.tgz
+*.log
+*.lcov
+python/.venv
+python/__pycache__

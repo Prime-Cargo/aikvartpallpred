@@ -14,6 +14,7 @@ import { runRetrain } from "./lib/training";
 import { supabaseSelect } from "./lib/supabase";
 import { getProphetForecast } from "./lib/prophet-loader";
 import { ALLOWED_ARTICLES } from "./config/articles";
+import { importOrders } from "./lib/import-orders";
 
 const server = serve({
   routes: {
@@ -122,6 +123,63 @@ const server = serve({
           });
 
           return Response.json(products);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+
+    "/api/products/:id/week": {
+      async GET(req) {
+        try {
+          const { id: productId } = req.params;
+          const url = new URL(req.url);
+          const refDate = url.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+
+          // Compute Monday–Sunday of the week containing refDate
+          const ref = new Date(refDate);
+          const dayOfWeek = ref.getDay(); // 0=Sun, 1=Mon...
+          const monday = new Date(ref);
+          monday.setDate(ref.getDate() - ((dayOfWeek + 6) % 7));
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+
+          const monStr = monday.toISOString().slice(0, 10);
+          const sunStr = sunday.toISOString().slice(0, 10);
+
+          // Fetch prophet forecasts for the week
+          const forecasts = await supabaseSelect<{
+            target_date: string;
+            predicted_qty: number;
+            yhat_lower: number;
+            yhat_upper: number;
+            model_version: string;
+          }>(
+            "prophet_forecasts",
+            `product_id=eq.${encodeURIComponent(productId)}&target_date=gte.${monStr}&target_date=lte.${sunStr}&order=target_date.asc`
+          );
+
+          // Build day-by-day array
+          const days: string[] = [];
+          for (let d = new Date(monday); d <= sunday; d.setDate(d.getDate() + 1)) {
+            days.push(d.toISOString().slice(0, 10));
+          }
+
+          const forecastMap = new Map(forecasts.map((f) => [f.target_date, f]));
+
+          const week = days.map((date) => {
+            const f = forecastMap.get(date);
+            return {
+              date,
+              predicted_qty: f ? Math.max(0, Math.round(f.predicted_qty)) : null,
+              confidence_low: f ? Math.max(0, Math.round(f.yhat_lower)) : null,
+              confidence_high: f ? Math.max(0, Math.round(f.yhat_upper)) : null,
+              model_version: f?.model_version ?? null,
+            };
+          });
+
+          return Response.json({ product_id: productId, week_start: monStr, week_end: sunStr, days: week });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           return Response.json({ error: message }, { status: 500 });
@@ -274,6 +332,24 @@ const server = serve({
     },
 
     // --- Job endpoints (called by n8n) ---
+
+    "/api/jobs/import-orders": {
+      async POST(req) {
+        try {
+          const body = await req.json().catch(() => ({}));
+          // Default: import yesterday's orders
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const from = body.from ?? yesterday.toISOString().slice(0, 10);
+          const to = body.to ?? from;
+          const result = await importOrders(from, to);
+          return Response.json(result);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
 
     "/api/jobs/match-outcomes": {
       async POST(req) {
