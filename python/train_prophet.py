@@ -99,14 +99,34 @@ def train_product(product_id: str) -> dict:
         full_model.add_regressor(reg)
     full_model.fit(df[["ds", "y"] + available_regressors])
 
-    # Generate 7-day forecast
+    # Generate 21-day forecast (this week + 2 weeks ahead)
     last_date = df["ds"].max()
-    future_dates = pd.date_range(last_date + timedelta(days=1), periods=7, freq="D")
+    future_dates = pd.date_range(last_date + timedelta(days=1), periods=21, freq="D")
     future_df = pd.DataFrame({"ds": future_dates})
 
-    # For future regressors, use last known values (simple carry-forward)
+    # Use actual calendar features for future dates, carry-forward for weather
+    calendar_regressors = [
+        "is_public_holiday", "is_school_holiday", "is_fellesferie",
+        "days_until_christmas", "days_until_easter", "days_until_17mai",
+    ]
+    cal_data = None
+    cal_regs_in_model = [r for r in calendar_regressors if r in available_regressors]
+    if cal_regs_in_model:
+        future_start = str((last_date + timedelta(days=1)).date())
+        future_end = str((last_date + timedelta(days=21)).date())
+        cal_rows = sb.table("calendar_features").select("date," + ",".join(cal_regs_in_model)) \
+            .gte("date", future_start).lte("date", future_end).order("date").execute()
+        if cal_rows.data:
+            cal_data = pd.DataFrame(cal_rows.data)
+            cal_data["ds"] = pd.to_datetime(cal_data["date"])
+
     for reg in available_regressors:
-        future_df[reg] = df[reg].iloc[-1]
+        if cal_data is not None and reg in cal_data.columns:
+            future_df = future_df.merge(cal_data[["ds", reg]], on="ds", how="left")
+            future_df[reg] = future_df[reg].fillna(0)
+        else:
+            # Weather/rolling regressors: carry forward last known value
+            future_df[reg] = df[reg].iloc[-1]
 
     forecast = full_model.predict(future_df)
 
