@@ -87,7 +87,6 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
   const filters: { key: ModelFilter; label: string; count: number }[] = [
     { key: "all", label: "Alle", count: counts.total },
     { key: "prophet", label: "Prophet", count: counts.prophet },
-    { key: "ols", label: "OLS", count: counts.ols },
     { key: "none", label: "Ingen", count: counts.none },
   ];
 

@@ -85,16 +85,13 @@ export function DetailPanel({ product, targetDate }: DetailPanelProps) {
           <div className="flex gap-1.5">
             {week.data.days.map((day) => {
               const isToday = day.date === today;
-              const isTarget = day.date === targetDate;
               return (
                 <div
                   key={day.date}
                   className={`flex-1 rounded-lg p-2.5 text-center min-w-[64px] ${
-                    isTarget
+                    isToday
                       ? "bg-primary/5 border-2 border-primary/60"
-                      : isToday
-                        ? "bg-accent border border-primary/20"
-                        : "bg-muted/40 border border-border"
+                      : "bg-muted/40 border border-border"
                   }`}
                 >
                   <div className="text-xs font-semibold text-muted-foreground">{dayLabel(day.date)}</div>
