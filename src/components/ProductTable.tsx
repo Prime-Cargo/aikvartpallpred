@@ -137,7 +137,7 @@ export function ProductTable({ products, loading, selectedId, onSelect }: Produc
           Type
         </SortHeader>
         <SortHeader sortKey="predicted_qty" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">
-          Ant.
+          Uke ∑
         </SortHeader>
       </div>
 

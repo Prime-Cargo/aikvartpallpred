@@ -51,7 +51,17 @@ const server = serve({
           tomorrow.setDate(tomorrow.getDate() + 1);
           const targetDate = url.searchParams.get("target_date") ?? tomorrow.toISOString().slice(0, 10);
 
-          // Batch-fetch all prophet forecasts for target_date
+          // Compute Monday–Sunday of the week containing targetDate
+          const ref = new Date(targetDate + "T00:00:00");
+          const dayOfWeek = ref.getDay();
+          const monday = new Date(ref);
+          monday.setDate(ref.getDate() - ((dayOfWeek + 6) % 7));
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          const monStr = monday.toISOString().slice(0, 10);
+          const sunStr = sunday.toISOString().slice(0, 10);
+
+          // Batch-fetch all prophet forecasts for the week
           const prophetRows = await supabaseSelect<{
             product_id: string;
             predicted_qty: number;
@@ -60,7 +70,7 @@ const server = serve({
             model_version: string;
           }>(
             "prophet_forecasts",
-            `target_date=eq.${targetDate}&select=product_id,predicted_qty,yhat_lower,yhat_upper,model_version&order=created_at.desc`
+            `target_date=gte.${monStr}&target_date=lte.${sunStr}&select=product_id,predicted_qty,yhat_lower,yhat_upper,model_version&order=created_at.desc`
           );
 
           // Batch-fetch all active OLS models
@@ -72,10 +82,22 @@ const server = serve({
             `is_active=eq.true&select=product_id,model_version`
           );
 
-          // Index by product_id (keep first = latest)
-          const prophetMap = new Map<string, typeof prophetRows[0]>();
+          // Aggregate by product_id: sum predicted_qty across the week
+          const prophetMap = new Map<string, { predicted_qty: number; yhat_lower: number; yhat_upper: number; model_version: string }>();
           for (const row of prophetRows) {
-            if (!prophetMap.has(row.product_id)) prophetMap.set(row.product_id, row);
+            const existing = prophetMap.get(row.product_id);
+            if (existing) {
+              existing.predicted_qty += row.predicted_qty;
+              existing.yhat_lower += row.yhat_lower;
+              existing.yhat_upper += row.yhat_upper;
+            } else {
+              prophetMap.set(row.product_id, {
+                predicted_qty: row.predicted_qty,
+                yhat_lower: row.yhat_lower,
+                yhat_upper: row.yhat_upper,
+                model_version: row.model_version,
+              });
+            }
           }
 
           const olsMap = new Map<string, typeof olsRows[0]>();
