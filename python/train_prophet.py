@@ -23,6 +23,8 @@ VERSION = f"prophet-v1-{datetime.now().strftime('%Y-%m')}"
 REGRESSORS = [
     "temp_avg", "precipitation_mm", "heavy_rain",
     "rolling_7d", "rolling_30d", "temp_delta",
+    "is_public_holiday", "is_school_holiday", "is_fellesferie",
+    "days_until_christmas", "days_until_easter", "days_until_17mai",
 ]
 
 

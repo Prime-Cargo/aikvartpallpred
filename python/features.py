@@ -44,6 +44,8 @@ def load_product_data(product_id: str) -> pd.DataFrame:
         "rolling_7d", "rolling_30d", "rolling_90d",
         "lag_1d", "lag_7d", "lag_14d",
         "temp_seasonal_norm", "precip_seasonal_norm", "temp_delta", "precip_delta",
+        "is_public_holiday", "is_school_holiday", "is_fellesferie",
+        "day_of_week", "days_until_christmas", "days_until_easter", "days_until_17mai",
     ]
     for col in numeric_cols:
         if col in df.columns:
@@ -74,10 +76,16 @@ def build_prophet_df(product_id: str) -> pd.DataFrame:
         "temp_avg", "precipitation_mm", "wind_speed",
         "rolling_7d", "rolling_30d", "rolling_90d",
         "temp_delta", "precip_delta",
+        "days_until_christmas", "days_until_easter", "days_until_17mai",
     ]
     for col in fill_cols:
         if col in df.columns:
             df[col] = df[col].ffill().fillna(0)
+
+    # Fill boolean calendar flags with 0 (not a holiday)
+    for col in ["is_public_holiday", "is_school_holiday", "is_fellesferie"]:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
 
     # Heavy rain binary flag
     df["heavy_rain"] = (df["precipitation_mm"] > 10).astype(float)
@@ -103,6 +111,8 @@ def build_prophet_df(product_id: str) -> pd.DataFrame:
         "temp_avg", "precipitation_mm", "heavy_rain",
         "rolling_7d", "rolling_30d", "temp_delta",
         "yoy_same_week", "n_customers",
+        "is_public_holiday", "is_school_holiday", "is_fellesferie",
+        "days_until_christmas", "days_until_easter", "days_until_17mai",
     ]
     result = df[[c for c in prophet_cols if c in df.columns]].copy()
     return result
